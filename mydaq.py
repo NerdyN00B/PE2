@@ -321,6 +321,215 @@ class MyDAQ():
         else:
             return np.stack((np.asarray(input_data),
                              np.asarray(output_data)))
+    
+    def measure_step_response(
+        self,
+        wait:float = 0.1,
+        duration:float = 1,
+        amplitude: float = 1,
+        amount: int = 1,
+        write_channel: str = 'ao0',
+        read_input_channel: str = 'ai0',
+        read_output_channel: str = 'ai1',
+        ) -> np.ndarray :
+        """Measure the step response function of a system.
+        
+        parameters
+        ----------
+        wait: float
+            The time in seconds before the step up. Defaults to 100ms
+        duration : float
+            The duration of the measurement in seconds after the step up.
+            Defaults to 1 second.
+        amplitude : float
+            The amplitude of the step function, defaults to 1 volt
+        amount : int
+            The number of times to do the measurement
+        write_channel : str
+            The channel to write the step function to
+        read_input_channel : str
+            The channel to read the original input from (straight from the 
+            output to this channel for later comparison)
+        read_output_channel : str
+            The channel to read the output of the system from
+        
+        returns
+        -------
+        np.ndarray
+            The measured data,
+            on the first axis, index 0 is the input data, index 1 is the output
+            data. On the second axis, the index corresponds to repeat.
+        """
+        length = MyDAQ.convertDurationToSamples(self.samplerate, duration+wait)
+        waitlength = MyDAQ.convertDurationToSamples(self.samplerate, wait)
+        step = np.ones(length) * amplitude
+        step[:waitlength] = 0
+        
+        input_data, output_data = [], []
+        
+        for _ in range(amount):
+            read = self.readWrite(step,
+                                  read_channel=[read_input_channel,
+                                                read_output_channel],
+                                  write_channel=write_channel
+                                  )
+            
+            input_data.append(read[0])
+            output_data.append(read[1])
+        
+        return np.stack((np.asarray(input_data),
+                         np.asarray(output_data)))
+    
+    
+    def measure_impulse_response(
+        self,
+        wait:float = 0.1,
+        impulse_width: int = 1,
+        duration:float = 1,
+        amplitude: float = 1,
+        amount: int = 1,
+        write_channel: str = 'ao0',
+        read_input_channel: str = 'ai0',
+        read_output_channel: str = 'ai1',
+        ) -> np.ndarray :
+        """Measure the step response function of a system.
+        
+        parameters
+        ----------
+        wait: float
+            The time in seconds before the impulse. Defaults to 100ms
+        impulse_width : int
+            The width of the impulse in samples
+        duration : float
+            The duration of the measurement in seconds after the start of the
+            impulse. Defaults to 1 second.
+        amplitude : float
+            The amplitude of the impulse, defaults to 1 volt
+        amount : int
+            The number of times to do the measurement
+        write_channel : str
+            The channel to write the impulse to
+        read_input_channel : str
+            The channel to read the original input from (straight from the 
+            output to this channel for later comparison)
+        read_output_channel : str
+            The channel to read the output of the system from
+        
+        returns
+        -------
+        np.ndarray
+            The measured data,
+            on the first axis, index 0 is the input data, index 1 is the output
+            data. On the second axis, the index corresponds to repeat.
+        """
+        length = MyDAQ.convertDurationToSamples(self.samplerate, duration+wait)
+        waitlength = MyDAQ.convertDurationToSamples(self.samplerate, wait)
+        impulse = np.ones(length) * amplitude
+        impulse[:waitlength] = 0
+        
+        input_data, output_data = [], []
+        
+        for _ in range(amount):
+            read = self.readWrite(impulse,
+                                  read_channel=[read_input_channel,
+                                                read_output_channel],
+                                  write_channel=write_channel
+                                  )
+            
+            input_data.append(read[0])
+            output_data.append(read[1])
+        
+        return np.stack((np.asarray(input_data),
+                         np.asarray(output_data)))
+    
+    
+    @staticmethod        
+    def get_transfer_from_response(
+        data: np.ndarray,
+        detection_height: float,
+        samplerate: int = 200_000,
+        is_step:bool = False
+        ) -> np.ndarray:
+        """Analyse the step response of a measured dataset.
+        
+        parameters
+        ----------
+        data : np.ndarray
+            The measured data, like provided by measure_step_response
+        stepheight : float
+            The minimum height to detect the step at
+        samplerate : int
+            The samplerate of the measurement
+        is_step : bool
+            if the supplied data is a step response if True, or an impulse
+            response if False.
+        
+        returns
+        -------
+        transfer functions : np.ndarray
+            The step response or transfer function of the system in the 
+            frequency domain.
+        frequencies : np.ndarray
+            The frequencies for the corresponding transfer function        
+        """
+        transfer_functions = []
+        frequencies = []
+        for i in range(data.shape[0]):
+            step = data[i][0]
+            start = MyDAQ.find_step(step, detection_height)
+            response = data[i][1][start:]
+            fourier = np.fft.fft(response)
+            freq = np.fft.fftfreq(len(response), 1/samplerate)
+            frequencies.append(freq)
+            
+            if is_step:
+                omega = 2 * np.pi * freq
+                fourier *= 1j * omega
+            
+            transfer_functions.append(fourier)
+        
+        return np.asarray(transfer_functions), np.asarray(frequencies)
+    
+    
+    @staticmethod
+    def quickplot_from_response(
+        transfer_function: np.ndarray,
+        frequencies: np.ndarray,
+        ):
+        """Plot the transfer function from a step or impulse response quickly.
+        
+        All stylistic choices are already made, this is purely for quick
+        plotting.
+        """
+        fig, gain_ax, phase_ax, polar_ax = MyDAQ.make_bode_plot(dpi=300,
+                                                                layout='tight',
+                                                                figsize=(16, 9)
+                                                                )
+        
+        transfer_function = transfer_function
+        transfer_function = transfer_function[:len(frequencies)//2]
+        frequencies = frequencies[:len(frequencies)//2]
+        
+        magnitude = np.abs(transfer_function)
+        gain = 20 * np.log10(magnitude)
+        phase = np.angle(transfer_function)
+        
+        gain_ax.scatter(frequencies, gain,
+                        marker='.', c='k', label='Gain')
+        gain_ax.set_xscale('log')
+        gain_ax.set_ylabel('Gain [dB]')
+        gain_ax.set_xlabel('Frequency [Hz]')
+        
+        phase_ax.scatter(frequencies, phase,
+                            marker='.', c='k', label='Phase')
+        phase_ax.set_xscale('log')
+        phase_ax.set_ylabel('Phase [rad]')
+        phase_ax.set_xlabel('Frequency [Hz]')
+        
+        polar_ax.scatter(phase, magnitude)
+        
+        return fig, gain_ax, phase_ax, polar_ax
+
 
     @staticmethod
     def get_transfer_functions(
@@ -559,6 +768,26 @@ class MyDAQ():
     @staticmethod
     def find_nearest_idx(a, value):
         return (np.abs(a - value)).argmin()
+    
+    @staticmethod
+    def find_step(a: np.ndarray,
+                  detection_height: float = 0.8
+                  ) -> int:
+        """Find the step in a signal.
+        
+        parameters
+        ----------
+        a : np.ndarray
+            The signal to find the step in
+        detection_height : float
+            The minimum height to detect the step at
+            
+        returns
+        -------
+        int
+            The index of the step
+        """
+        return np.argmax(a > detection_height)
 
     @staticmethod
     def generateWaveform(
