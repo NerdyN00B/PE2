@@ -13,9 +13,10 @@ import tkinter as tk
 from tkinter import filedialog
 from datetime import datetime
 
-first = True
+first = False
 centerfreq = 1024
-duration = 10
+duration = 60
+new = False
 
 daq = MyDAQ_Long()
 
@@ -25,7 +26,7 @@ def find_closest_idx(array, value):
 
 def quickplot(hanning=True):
     possible_freqs = [512, 1024, 2048, 4096, 8192]
-    time, data = daq.capture(duration=1, samplerate=200_000)
+    time, data = daq.capture(duration=2, samplerate=200_000)
     
     if hanning:
         window = np.hanning(len(data))
@@ -61,24 +62,37 @@ def quickplot(hanning=True):
     return fig, ax
 
 
-def longmeasure(center_freq, duration, hanning=True):
-    dir = os.getcwd()
-    dir += '/session_2'
+def longmeasure(center_freq, duration, hanning=True, new=True):
+    if new:
+    
+        dir = os.getcwd()
+        dir += '/session_2'
 
-    root = tk.Tk()
-    root.withdraw()
+        root = tk.Tk()
+        root.withdraw()
 
-    savefile = filedialog.asksaveasfilename(filetypes=[('Numpy files', '.npy')],
-                                            defaultextension='.npy',
-                                            initialdir=dir,
-                                            title='Save raw data as',
-                                            confirmoverwrite=True,
-                                            )
-    
-    time, data = daq.capture(duration=duration, samplerate=200_000)
-    
-    np.save(savefile, data)
-    
+        savefile = filedialog.asksaveasfilename(filetypes=[('Numpy files', '.npy')],
+                                                defaultextension='.npy',
+                                                initialdir=dir,
+                                                title='Save raw data as',
+                                                confirmoverwrite=True,
+                                                )
+        
+        time, data = daq.capture(duration=duration, samplerate=200_000)
+        
+        np.save(savefile, data)
+    else:
+        root = tk.Tk()
+        root.withdraw()
+
+        dir = os.getcwd() + '/session_2'
+
+        savefile = filedialog.askopenfilename(filetypes=[('Numpy files', '.npy')],
+                                                initialdir=dir,
+                                                title='Select data file',
+                                                )
+        data = np.load(savefile)
+        
     if hanning:
         window = np.hanning(len(data))
         data = data * window
@@ -88,26 +102,40 @@ def longmeasure(center_freq, duration, hanning=True):
     
     gain = 20 * np.log10(abs(fourier))
     
-    center_idx = find_closest_idx(freq, center_freq)
+    # fig, ax = plt.subplots(dpi=300)
     
-    fig, ax = plt.subplot(dpi=300)
-    ax.scatter(freq, gain,
-               c='k',
-               marker='.'
-               )
-    ax.set_xscale('log')
-    ax.set_xlim(freq[center_idx-10], freq[center_idx+10])
+    possible_freqs = [512, 1024, 2048, 4096, 8192]
     
-    ax.set_xlabel('Frequency $f$ [$Hz$]')
-    ax.set_ylabel('amplitude $A$ [$dB$]')
+    for possible_freq in possible_freqs:
+        
+        center_idx = find_closest_idx(freq, possible_freq)
+        
+        fig, ax = plt.subplots(dpi=300)
+        ax.vlines(possible_freqs, np.min(gain), np.max(gain),
+                colors='r',
+                linestyle='--',
+                )
+        
+        ax.scatter(freq, gain,
+                c='k',
+                marker='.',
+                s=10,
+                )
+        
+        
+        ax.set_xscale('log')
+        ax.set_xlim(freq[center_idx-10], freq[center_idx+10])
+        
+        ax.set_xlabel('Frequency $f$ [$Hz$]')
+        ax.set_ylabel('amplitude $A$ [$dB$]')
+        
+        # fig.savefig(savefile.replace('.npy', '.pdf'))
+        fig.savefig(savefile.replace('.npy', f'_{possible_freq}.png'))
     
-    fig.savefig(savefile.replace('.npy', '.pdf'))
-    fig.savefig(savefile.replace('.npy', '.png'))
-    
-    return fig, ax, data
+    return
 
 if __name__ == '__main__':
     if first:
         fig, ax = quickplot()
     else:
-        fig, ax, data = longmeasure(centerfreq, duration)
+        longmeasure(centerfreq, duration, new=new)
