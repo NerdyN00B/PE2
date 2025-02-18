@@ -20,6 +20,8 @@ test = True
 n_measurements = 1000
 n_bins = 50
 
+extra = False
+
 scope = RigolOscilloscope()
 
 
@@ -110,9 +112,42 @@ def full_measurement(n_measurements=1000, n_bins=50):
     return fig, ax
 
 
+def noise_spectral_density():
+    root = tk.Tk()
+    root.withdraw()
+
+    dir = os.getcwd() + '/Session_1'
+
+    file_path = filedialog.askopenfilename(filetypes=[('Numpy files', '.npy')],
+                                            initialdir=dir,
+                                            title='Select data file',
+                                            )
+    
+    data = np.load(file_path)
+    time = data[0]
+    voltage = data[1]
+    
+    f, Pxx = periodogram(voltage, fs=200_000)
+    average_Pxx = np.mean(Pxx, axis=0)
+    
+    fig, ax = plt.subplots()
+    ax.scatter(f, average_Pxx,
+               c='k',
+               marker='.'
+               )
+    ax.set_xscale('log')
+    ax.set_xlabel('Frequency $f$ [$Hz$]')
+    ax.set_ylabel('Power spectral density $PSD$ [$V^2/Hz$]')
+    
+    fig.savefig(file_path.replace('.npy', '_PSD.pdf'))
+    fig.savefig(file_path.replace('.npy', '_PSD.png'))    
+
+
 if __name__ == "__main__":
     if test:
         fig, ax = plot_single(single_measurement())
         plt.show()
-    else:
+    elif not test and not extra:
         fig, ax = full_measurement(n_measurements, n_bins)
+    elif extra:
+        noise_spectral_density()
