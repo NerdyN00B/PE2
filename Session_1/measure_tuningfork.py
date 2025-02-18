@@ -27,8 +27,16 @@ savefile = filedialog.asksaveasfilename(filetypes=[('Numpy files', '.npy')],
                                          )
 
 
-daq = md(200_000, name='myDAQ2')
+daq = md(200_000, name='myDAQ3')
 
 data = daq.read(1, channel='ai0')
 
 np.save(savefile, data)
+
+fig = plt.figure()
+ax, ax1 = fig.subplots(2, 1)
+
+ax.plot(data)
+ax1.plot(abs(np.fft.fft(data)))
+ax1.set_xscale('log')
+plt.show()

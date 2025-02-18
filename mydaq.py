@@ -424,8 +424,8 @@ class MyDAQ():
         """
         length = MyDAQ.convertDurationToSamples(self.samplerate, duration+wait)
         waitlength = MyDAQ.convertDurationToSamples(self.samplerate, wait)
-        impulse = np.ones(length) * amplitude
-        impulse[:waitlength] = 0
+        impulse = np.zeros(length) * amplitude
+        impulse[waitlength:waitlength+impulse_width] = amplitude
         
         input_data, output_data = [], []
         
@@ -474,10 +474,11 @@ class MyDAQ():
         """
         transfer_functions = []
         frequencies = []
-        for i in range(data.shape[0]):
-            step = data[i][0]
+        for i in range(data.shape[1]):
+            step = data[0][i]
             start = MyDAQ.find_step(step, detection_height)
-            response = data[i][1][start:]
+            response = data[1][i]
+            
             fourier = np.fft.fft(response)
             freq = np.fft.fftfreq(len(response), 1/samplerate)
             frequencies.append(freq)
@@ -501,10 +502,7 @@ class MyDAQ():
         All stylistic choices are already made, this is purely for quick
         plotting.
         """
-        fig, gain_ax, phase_ax, polar_ax = MyDAQ.make_bode_plot(dpi=300,
-                                                                layout='tight',
-                                                                figsize=(16, 9)
-                                                                )
+        fig, gain_ax = plt.subplots(dpi=300, layout='tight', figsize=(10, 5))
         
         transfer_function = transfer_function
         transfer_function = transfer_function[:len(frequencies)//2]
@@ -512,7 +510,6 @@ class MyDAQ():
         
         magnitude = np.abs(transfer_function)
         gain = 20 * np.log10(magnitude)
-        phase = np.angle(transfer_function)
         
         gain_ax.scatter(frequencies, gain,
                         marker='.', c='k', label='Gain')
@@ -520,15 +517,7 @@ class MyDAQ():
         gain_ax.set_ylabel('Gain [dB]')
         gain_ax.set_xlabel('Frequency [Hz]')
         
-        phase_ax.scatter(frequencies, phase,
-                            marker='.', c='k', label='Phase')
-        phase_ax.set_xscale('log')
-        phase_ax.set_ylabel('Phase [rad]')
-        phase_ax.set_xlabel('Frequency [Hz]')
-        
-        polar_ax.scatter(phase, magnitude)
-        
-        return fig, gain_ax, phase_ax, polar_ax
+        return fig, gain_ax
 
 
     @staticmethod

@@ -15,6 +15,10 @@ from tkinter import filedialog
 samplerate = 200_000
 duration = 1
 
+window_time = 0.5
+
+n_samples = int(samplerate * window_time)
+
 ## Prompt loading and load data
 root = tk.Tk()
 root.withdraw()
@@ -28,6 +32,8 @@ file_path = filedialog.askopenfilename(filetypes=[('Numpy files', '.npy')],
 
 data = np.load(file_path)
 
+data = data[:n_samples]
+
 sq_fourier_1 = np.fft.fft(data)
 
 window = np.hanning(len(data))
@@ -35,12 +41,24 @@ hanning_fourier_1 = np.fft.fft(data * window)
 
 frequencies = np.fft.fftfreq(len(data), 1 / samplerate)
 
-fig, ax = plt.subplots(figsize=(16, 9), dpi=300)
+idx = md.find_nearest_idx(frequencies, 440)
+range = 100
 
-ax.scatter(frequencies[:len(frequencies) // 2],
-           20*np.log10(np.abs(sq_fourier_1)[:len(frequencies) // 2]),
-           label='Square window, 1s')
+fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
 
-ax.scatter(frequencies[:len(frequencies) // 2],
-           20*np.log10(np.abs(hanning_fourier_1)[:len(frequencies) // 2]),
-           label='Hanning window, 1s')
+ax.plot(frequencies[idx - range:idx + range],
+           20*np.log10(np.abs(sq_fourier_1)[idx - range:idx + range]),
+           label=f'Square window, {window_time}s', marker='.')
+
+ax.plot(frequencies[idx - range:idx + range],
+           20*np.log10(np.abs(hanning_fourier_1)[idx - range:idx + range]),
+           label=f'Hanning window, {window_time}s', marker='.')
+ax.set_title(f'Tuning fork frequency analysis with a window of {window_time} seconds')
+
+ax.set_xscale('log')
+ax.set_xlabel('Frequency (Hz)')
+ax.set_ylabel('Magnitude (dB)')
+ax.legend()
+
+fig.savefig(file_path.replace('.npy', f'_analysed_{window_time}s.pdf'))
+fig.savefig(file_path.replace('.npy', f'_analysed_{window_time}.png'))
