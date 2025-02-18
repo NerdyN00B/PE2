@@ -16,11 +16,11 @@ from scipy.signal import find_peaks, periodogram
 
 # TODO: CALCULATE NOISE SPECTRAL DENSITY
 
-test = True
+test = False
 n_measurements = 1000
-n_bins = 50
+n_bins = None
 
-extra = False
+extra = True
 
 scope = RigolOscilloscope()
 
@@ -34,10 +34,11 @@ def center_bins(bin_edges):
 
 def single_measurement():
     time, voltage = scope.captureChannel1()
-    peaks = find_peaks(voltage,
+    peaks, rest = find_peaks(voltage,
                        height=None,
                        threshold=None,
-                       distance=None,
+                       distance=10,
+                       prominence=0.001
                        )
     return time, voltage, peaks
 
@@ -57,10 +58,10 @@ def plot_single(time, voltage, peaks):
     ax.set_ylabel('voltage $V$ [$V$]')
     ax.legend()
     
-    timestring = datetime.datetime.now().strftime("%d-%b-%Y (%H:%M:%S)")
-    savething = parentdir + 'session_2//figures//' + 'scopetest_' + timestring
-    fig.savefig(savething + '.pdf')
-    fig.savefig(savething + '.png')
+    timestring = datetime.now().strftime("%d-%b-%Y (%H%M%S)")
+    savething = parentdir + '\\session_2\\figures\\' + 'scopetest_' + timestring
+    plt.savefig(savething + '.pdf')
+    plt.savefig(savething + '.png')
     return fig, ax
 
 
@@ -88,22 +89,33 @@ def full_measurement(n_measurements=1000, n_bins=50):
     times = np.asarray(times)
     voltages = np.asarray(voltages)
     n_peaks = np.asarray(n_peaks)
+
+    full_time = np.max(times)
+    print(full_time)
+
+    np.save(savefile, np.stack((times, voltages)))
     
-    np.save(savefile, np.stack((times, voltages, n_peaks)))
-    
-    mean = np.mean(n_peaks)
-    std = np.std(n_peaks)
+    n_pps = n_peaks
+
+    mean = np.mean(n_pps)
+    std = np.std(n_pps)
     print("mean =\n\t", mean)
     print("std = \n\t", std)
+
+    if n_bins is None:
+        n_bins = int(np.max(n_peaks) - np.min(n_peaks))
     
-    hist, bin_edges = np.histogram(n_peaks, n_bins)
+    
+
+    hist, bin_edges = np.histogram(n_pps, n_bins)
     bins = center_bins(bin_edges)
     fig, ax = plt.subplots(dpi=300, layout='tight')
     
-    ax.hist(hist, bins,
+    ax.stairs(hist, bin_edges,
             color='k',
-            label=f"mean = {mean:.2f}, std = {std:.2f}")
-    ax.set_xlabel('number of peaks $N_{peaks}$')
+            label=f"mean = {mean:.2f}, std = {std:.2f}",
+            )
+    ax.set_xlabel('number of peaks per second $N_{peaks}$')
     ax.set_ylabel('number of measurements $N_{measure}$')
     ax.legend()
     
@@ -111,12 +123,11 @@ def full_measurement(n_measurements=1000, n_bins=50):
     fig.savefig(savefile.replace('.npy', '.png'))
     return fig, ax
 
-
 def noise_spectral_density():
     root = tk.Tk()
     root.withdraw()
 
-    dir = os.getcwd() + '/Session_1'
+    dir = os.getcwd() + '/session_2'
 
     file_path = filedialog.askopenfilename(filetypes=[('Numpy files', '.npy')],
                                             initialdir=dir,
@@ -136,6 +147,7 @@ def noise_spectral_density():
                marker='.'
                )
     ax.set_xscale('log')
+    ax.set_yscale('log')
     ax.set_xlabel('Frequency $f$ [$Hz$]')
     ax.set_ylabel('Power spectral density $PSD$ [$V^2/Hz$]')
     
@@ -145,8 +157,7 @@ def noise_spectral_density():
 
 if __name__ == "__main__":
     if test:
-        fig, ax = plot_single(single_measurement())
-        plt.show()
+        fig, ax = plot_single(*single_measurement())
     elif not test and not extra:
         fig, ax = full_measurement(n_measurements, n_bins)
     elif extra:
