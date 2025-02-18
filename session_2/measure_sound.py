@@ -36,8 +36,9 @@ def quickplot(hanning=True):
     
     gain = 20 * np.log10(abs(fourier))
     
-    fig, ax = plt.subplot(dpi=300)
-    ax.scatter(gain[:len(freq//2)], freq[:len(freq)//2],
+    fig, ax = plt.subplots(dpi=300, layout='tight')
+    
+    ax.scatter(freq[:len(freq)//2], gain[:len(freq)//2],
                c='k',
                marker='.'
                )
@@ -49,11 +50,11 @@ def quickplot(hanning=True):
               colors='r',
               linestyle='--',
               )
-    ax.set_xlim(0, 10_000)
+    # ax.set_xlim(0, 10_000)
     ax.set_xticks(possible_freqs)
     
-    timestring = datetime.datetime.now().strftime("%d-%b-%Y (%H:%M:%S)")
-    savething = parentdir + 'session_2//figures//' + 'soundtest_' + timestring
+    timestring = datetime.now().strftime("%d-%b-%Y(%H%M%S)")
+    savething = parentdir + '\\session_2\\figures\\' + 'soundtest_' + timestring
     fig.savefig(savething + '.pdf')
     fig.savefig(savething + '.png')
     

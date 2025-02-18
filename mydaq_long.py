@@ -15,7 +15,7 @@ class MyDAQ_Long():
 		self.data = [] # Clear data
 		
 		self.task = dx.Task()
-		self.task.ai_channels.add_ai_voltage_chan("myDAQ1/ai0")
+		self.task.ai_channels.add_ai_voltage_chan("myDAQ3/ai0")
 		self.task.timing.cfg_samp_clk_timing(samplerate,sample_mode=dx.constants.AcquisitionType.CONTINUOUS)
 		self.task.register_every_n_samples_acquired_into_buffer_event(chunksize, self.updateData)
 		self.task.start()
