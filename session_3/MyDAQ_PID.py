@@ -1,6 +1,7 @@
 import nidaqmx as dx
 from nidaqmx import stream_readers
 import numpy as np
+import time
 
 class MyDAQ_PID():
     def __init__(self,
@@ -8,7 +9,7 @@ class MyDAQ_PID():
                  min_output,
                  max_output,
                  samplerate:int=200_000,
-                 name:str='myDAQ2',
+                 name:str='myDAQ3',
                  feedback_rate:int=20,
                  feedback_cycles:int=100,
                  kp=0, ki=0, kd=0,
@@ -67,8 +68,9 @@ class MyDAQ_PID():
     
     def feedback_function(self):
         data = np.concatenate(self.data)
+        # data = self.data[-1]
         
-        error = self.setpoint - np.mean(data)
+        error = self.setpoint - data
         
         timelength = data.size / self.samplerate
         time = np.linspace(0, timelength, data.size)
@@ -97,15 +99,15 @@ class MyDAQ_PID():
         self.reader.read_many_sample(buffer, num_samples)
         
         self.data.append(buffer[0])
+        # print(len(self.data))
         
         feedback = self.feedback_function()
         
-        print(f"Writing {feedback:.2f} Volts to AO0")
+        print(f"Writing {feedback:.2f} Volts to AO0".rjust(50))
         self.writeTask.write(feedback, auto_start=True)
         self.writeTask.stop()
         
-        if self.__repeats == self.feedback_cycles:
-            self.readTask.stop()
+        return 0
 
     
     def measure(self):
@@ -124,5 +126,18 @@ class MyDAQ_PID():
             
             self.readTask.register_every_n_samples_acquired_into_buffer_event(samples_per_buffer, self.reading_task_callback)
             self.readTask.start()
+            
+            time.sleep(5)
+            self.readTask.stop()
+            self.writeTask.write(0, auto_start=True)
+            self.writeTask.stop()
         
-        return np.concatenate(self.data)
+        # return np.concatenate(self.data)
+        
+    @property
+    def data(self):
+        return self.__data
+    
+    @data.setter
+    def data(self, value):
+        self.__data = value
