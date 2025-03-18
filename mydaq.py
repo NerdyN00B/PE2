@@ -424,7 +424,7 @@ class MyDAQ():
         """
         length = MyDAQ.convertDurationToSamples(self.samplerate, duration+wait)
         waitlength = MyDAQ.convertDurationToSamples(self.samplerate, wait)
-        impulse = np.zeros(length) * amplitude
+        impulse = np.zeros(length)
         impulse[waitlength:waitlength+impulse_width] = amplitude
         
         input_data, output_data = [], []
@@ -478,6 +478,7 @@ class MyDAQ():
             step = data[0][i]
             start = MyDAQ.find_step(step, detection_height)
             response = data[1][i]
+            # response = response[start:]
             
             fourier = np.fft.fft(response)
             freq = np.fft.fftfreq(len(response), 1/samplerate)
